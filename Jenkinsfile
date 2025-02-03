@@ -3,7 +3,7 @@ pipeline {
     stages {
         stage("View content") {
             steps {
-               sh 'dir /a'
+               bat 'dir /a'
             }
         }
     }
