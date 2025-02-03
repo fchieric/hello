@@ -3,9 +3,7 @@ pipeline {
     stages {
         stage("View content") {
             steps {
-                script {
-                    sh 'ls -la'
-                }
+               'dir /a'
             }
         }
     }
