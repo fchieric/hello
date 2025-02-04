@@ -1,10 +1,23 @@
 pipeline {
     agent any
     stages {
-        stage("View content") {
+        stage("Show file") {
             steps {
-               bat 'dir /a'
+               script {
+                    def branchName = env.BRANCH_NAME
+                    echo "Branch corrente: ${branchName}"
+                    bat """
+                        echo Lista dei file nel branch ${branchName}:
+                        dir /s /b
+                    """
+               }   
             }
+        }
+        success {
+            echo 'Pipeline completata con successo!'
+        }
+        failure {
+            echo 'Pipeline fallita!'
         }
     }
 }
