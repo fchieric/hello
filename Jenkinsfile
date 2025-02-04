@@ -13,6 +13,8 @@ pipeline {
                }   
             }
         }
+    }
+    post {
         success {
             echo 'Pipeline completata con successo!'
         }
