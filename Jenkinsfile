@@ -2,6 +2,7 @@ pipeline {
     agent any
     
     environment {
+        PATH = "/home/jenkins/.local/bin:$PATH"
         NORMINETTE_EXIT_CODE = 0
         TOTAL_FILES = 0
         FAILED_FILES = 0
@@ -9,30 +10,22 @@ pipeline {
     }
     
     stages {
-        stage('Install dependencies') {
-            steps {
-                sh '''
-                   # Check current user and permissions
-                    whoami
-                    id
-                    # Check if you can write to system directories
-                    touch /tmp/test && echo "Write permission OK"
-                '''
-            }
-        }
-        
         stage('Install minikube and kubectl') {
             steps {
                 sh '''
-                    # Download and install minikube
+                    # Install to user's home directory instead of system
+                    mkdir -p $HOME/.local/bin
+                    
+                    # Download minikube
                     curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
                     chmod +x minikube-linux-amd64
-                    mv minikube-linux-amd64 /usr/local/bin/minikube
-                    # Download and install kubectl
+                    mv minikube-linux-amd64 $HOME/.local/bin/minikube
+                    
+                    # Download kubectl
                     KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt)
                     curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
                     chmod +x kubectl
-                    mv kubectl /usr/local/bin/kubectl
+                    mv kubectl $HOME/.local/bin/kubectl
                 '''
             }
         }
