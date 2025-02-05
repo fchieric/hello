@@ -1,22 +1,30 @@
 pipeline {
-    agent any
-    stages {
-        stage("Show file") {
-            steps {
-               script {
-                    def branchName = env.BRANCH_NAME
-                    echo "Branch corrente: ${branchName}"
-                    sh 'ls -la'
-               }   
-            }
+    agent {
+        kubernetes {
+            yaml '''
+                apiVersion: v1
+                kind: Pod
+                spec:
+                  containers:
+                  - name: norminette
+                    image: ghcr.io/fchieric/norminette-checker:latest
+                    command:
+                    - cat
+                    tty: true
+                    # cat -> sovrascrive il comando predefinito del container per evitare che termini, mantenendo il container in esecuz
+                    # tty: true -> Alloca un terminale per il container: consente a Jenkins di eseguire comandi nel container
+            '''
         }
     }
-    post {
-        success {
-            echo 'Pipeline completata con successo!'
-        }
-        failure {
-            echo 'Pipeline fallita!'
+    
+    stages {
+        stage('Norminetting') {
+            steps {
+                container('norminette') {
+                            sh 'norminette src/'
+                    }
+                }
+            }
         }
     }
 }
