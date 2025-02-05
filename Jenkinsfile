@@ -15,14 +15,12 @@ pipeline {
                     # tty: true -> Alloca un terminale per il container: consente a Jenkins di eseguire comandi nel container
             '''
         }
-    }
-    
+    }   
     stages {
         stage('Norminetting') {
             steps {
                 container('norminette') {
-                            sh 'norminette src/'
-                    }
+                        sh 'norminette src/'
                 }
             }
         }
