@@ -12,13 +12,11 @@ pipeline {
         stage('Install dependencies') {
             steps {
                 sh '''
-                    apt-get update
-                    apt-get install -y curl wget software-properties-common        
-                    # Install Docker if not already present
-                    if ! command -v docker &> /dev/null; then
-                        curl -fsSL https://get.docker.com -o get-docker.sh
-                        sh get-docker.sh
-                    fi
+                   # Check current user and permissions
+                    whoami
+                    id
+                    # Check if you can write to system directories
+                    touch /tmp/test && echo "Write permission OK"
                 '''
             }
         }
