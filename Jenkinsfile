@@ -25,4 +25,12 @@ pipeline {
             }
         }
     }
+    post {
+        success {
+            echo 'Yeeeee pipeline completata!'
+        }
+        failure {
+            echo 'Pipeline fallita :( !'
+        }
+    }
 }
