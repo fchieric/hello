@@ -6,10 +6,7 @@ pipeline {
                script {
                     def branchName = env.BRANCH_NAME
                     echo "Branch corrente: ${branchName}"
-                    bat """
-                        echo Lista dei file nel branch ${branchName}:
-                        dir /s /b
-                    """
+                    sh 'ls -la'
                }   
             }
         }
