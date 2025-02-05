@@ -115,8 +115,8 @@ pipeline {
         
         always {
             sh '''
-                minikube stop
-                minikube delete
+                $HOME/.local/bin/minikube stop || true
+                $HOME/.local/bin/minikube delete || true
             '''
         }
     }
