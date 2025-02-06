@@ -2,7 +2,6 @@ pipeline {
     agent any
     
     environment {
-        PATH = "/home/jenkins/.local/bin:$PATH"
         NORMINETTE_EXIT_CODE = 0
         TOTAL_FILES = 0
         FAILED_FILES = 0
@@ -10,84 +9,46 @@ pipeline {
     }
     
     stages {
-        stage('Install minikube and kubectl') {
-            steps {
-                sh '''
-                    # Install to user's home directory instead of system
-                    mkdir -p $HOME/.local/bin
-                    
-                    # Download minikube
-                    curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-                    chmod +x minikube-linux-amd64
-                    mv minikube-linux-amd64 $HOME/.local/bin/minikube
-                    
-                    # Download kubectl
-                    KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt)
-                    curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
-                    chmod +x kubectl
-                    mv kubectl $HOME/.local/bin/kubectl
-                '''
-            }
-        }
-        
-        stage('Start minikube') {
-            steps {
-                sh 'minikube start --driver=docker'
-            }
-        }
-        
-        stage('Prepare norminette check') {
+        stage('Prepare Environment') {
             steps {
                 script {
-                    // conta il numero totale di file C
+                    // Conta il numero totale di file C
                     env.TOTAL_FILES = sh(
                         script: 'find src/ -type f -name "*.c" | wc -l',
                         returnStdout: true
                     ).trim()
-                    //.trim serve a togliere spazi in caso ci siano
                 }
             }
         }
         
-        stage('Norminetting') {
+        stage('Run Norminette') {
             agent {
-                kubernetes {
-                    yaml '''
-                    apiVersion: v1
-                    kind: Pod
-                    spec:
-                      containers:
-                      - name: norminette
-                        image: ghcr.io/fchieric/norminette-checker:latest
-                        command:
-                        - cat
-                        tty: true
-                    '''
-                    //cat e tty per evitare che si chiuda il container
+                docker {
+                    image 'ghcr.io/fchieric/norminette-checker:latest'
+                    args '-v ${WORKSPACE}:/workspace'
                 }
             }
             steps {
-                // Runna norminette e cattura l' output
                 script {
                     try {
-                        def normResult = sh(
-                            script: 'norminette src/',
-                            returnStatus: true
+                        // Esegui norminette e cattura l'output
+                        def normOutput = sh(
+                            script: 'cd /workspace && norminette src/',
+                            returnStdout: true
                         )
                         
-                        // Lista dei file che falliscono
-                        def failedFiles = sh(
-                            script: 'norminette src/ | grep -c "KO!"',
+                        // Conta i file falliti
+                        env.FAILED_FILES = sh(
+                            script: 'echo "${normOutput}" | grep -c "Error!"',
                             returnStdout: true
-                        ).trim()
+                        ).trim() ?: "0"
                         
-                        env.FAILED_FILES = failedFiles
-                        env.PASSED_FILES = "${Integer.parseInt(env.TOTAL_FILES) - Integer.parseInt(failedFiles)}"
-                        env.NORMINETTE_EXIT_CODE = normResult
+                        // Calcola i file che hanno passato il test
+                        env.PASSED_FILES = "${Integer.parseInt(env.TOTAL_FILES) - Integer.parseInt(env.FAILED_FILES)}"
                         
-                        // Se normResult non è zero, significa che alcuni file hanno fallito
-                        if (normResult != 0) {
-                            error "Norminette found style errors in some files"
+                        // Se ci sono file falliti, marca lo stage come fallito
+                        if (env.FAILED_FILES.toInteger() > 0) {
+                            error "Norminette ha trovato errori in ${env.FAILED_FILES} file(i)"
                         }
                     } catch (Exception e) {
                         env.NORMINETTE_EXIT_CODE = 1
@@ -100,24 +61,22 @@ pipeline {
     
     post {
         success {
-            echo "Tutto norminetatto ✅"
-            echo "File totali: ${env.TOTAL_FILES}"
-            echo "File norminettati: ${env.PASSED_FILES}"
-            echo "File non norminettati: ${env.FAILED_FILES}"
+            echo """
+            ✅ Norminette Check completato con successo!
+            📊 Report:
+            - File totali analizzati: ${env.TOTAL_FILES}
+            - File che hanno passato: ${env.PASSED_FILES}
+            - File con errori: ${env.FAILED_FILES}
+            """
         }
-        
         failure {
-            echo "Norminette non superata ❌"
-            echo "File totali: ${env.TOTAL_FILES}"
-            echo "File norminettati: ${env.PASSED_FILES}"
-            echo "File non norminettati: ${env.FAILED_FILES}"
-        }
-        
-        always {
-            sh '''
-                $HOME/.local/bin/minikube stop || true
-                $HOME/.local/bin/minikube delete || true
-            '''
+            echo """
+            ❌ Norminette Check fallito!
+            📊 Report:
+            - File totali analizzati: ${env.TOTAL_FILES}
+            - File che hanno passato: ${env.PASSED_FILES}
+            - File con errori: ${env.FAILED_FILES}
+            """
         }
     }
 }
