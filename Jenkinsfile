@@ -2,12 +2,12 @@ pipeline {
     agent any
     
     stages {
-        stage('Setup') {
+        stage('Setup Python Environment') {
             steps {
                 sh '''
-                    apt-get update
-                    apt-get install -y python3 python3-pip
-                    pip3 install norminette
+                    python3 -m venv venv
+                    . venv/bin/activate
+                    pip install norminette
                 '''
             }
         }
@@ -15,6 +15,7 @@ pipeline {
         stage('Run Norminette') {
             steps {
                 sh '''
+                    . venv/bin/activate
                     total_files=0
                     passed_files=0
                     failed_files=0
@@ -42,6 +43,12 @@ pipeline {
                     [ $failed_files -eq 0 ]
                 '''
             }
+        }
+    }
+    
+    post {
+        always {
+            sh 'rm -rf venv'
         }
     }
 }
