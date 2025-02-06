@@ -6,7 +6,6 @@ pipeline {
         TOTAL_FILES = 0
         FAILED_FILES = 0
         PASSED_FILES = 0
-        WORKSPACE_PATH = '/var/jenkins_home/workspace/norminetter'
     }
     
     stages {
@@ -20,7 +19,7 @@ pipeline {
                         echo "src directory contents:"
                         ls -la src/
                         echo "Find test:"
-                        find src/ -type f -name "*.c"
+                        find "$(pwd)/src" -type f -name "*.c"
                     '''
                 }
             }
@@ -29,9 +28,8 @@ pipeline {
         stage('Prepare Environment') {
             steps {
                 script {
-                    // Protezione del pattern con virgolette singole
                     env.TOTAL_FILES = sh(
-                        script: "find src/ -type f -name '*.c' | wc -l",
+                        script: 'ls src/*.c | wc -l',
                         returnStdout: true
                     ).trim()
                     echo "Found ${env.TOTAL_FILES} C files to check"
@@ -43,16 +41,13 @@ pipeline {
             steps {
                 script {
                     try {
-                        // Esegui un test di accesso alla directory
-                        sh 'docker run --rm -v "$PWD":/code -w /code alpine ls -la src/'
-                        
                         def normOutput = sh(
                             script: '''
                                 docker run --rm \\
-                                    -v "$PWD":/code \\
+                                    -v "$(pwd)":/code:ro \\
                                     -w /code \\
                                     ghcr.io/fchieric/norminette-checker:latest \\
-                                    sh -c "cd /code && ls -la && norminette src/"
+                                    sh -c "pwd && ls -la && norminette src/*.c"
                             ''',
                             returnStdout: true
                         )
