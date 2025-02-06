@@ -15,7 +15,6 @@ pipeline {
                     // Stampa il contenuto della directory per debug
                     sh '''
                         echo "Current directory: $PWD"
-                        echo "Workspace: $WORKSPACE"
                         echo "Directory contents:"
                         ls -la
                         echo "src directory contents:"
@@ -28,7 +27,7 @@ pipeline {
         stage('Prepare Environment') {
             steps {
                 script {
-                    // Conta il numero totale di file C
+                    // Conta il numero totale di file C (correzione del comando find)
                     env.TOTAL_FILES = sh(
                         script: 'find src/ -type f -name "*.c" | wc -l',
                         returnStdout: true
@@ -42,15 +41,18 @@ pipeline {
             steps {
                 script {
                     try {
-                        // Esegui norminette usando il path assoluto
+                        // Test del mount point
+                        sh 'docker run --rm -v "$PWD":/workdir -w /workdir alpine ls -la /workdir/src/'
+                        
+                        // Esegui norminette con path assoluto
                         def normOutput = sh(
-                            script: """
+                            script: '''
                                 docker run --rm \
-                                    -v "\${PWD}":/workdir \
+                                    -v "$PWD":/workdir \
                                     -w /workdir \
                                     ghcr.io/fchieric/norminette-checker:latest \
-                                    norminette src/
-                            """,
+                                    sh -c "ls -la && norminette src/"
+                            ''',
                             returnStdout: true
                         )
                         
@@ -58,7 +60,7 @@ pipeline {
                         
                         // Conta i file falliti
                         env.FAILED_FILES = sh(
-                            script: """echo "\${normOutput}" | grep -c "Error!" || echo "0" """,
+                            script: 'echo "${normOutput}" | grep -c "Error!" || echo "0"',
                             returnStdout: true
                         ).trim()
                         
