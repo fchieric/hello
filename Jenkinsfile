@@ -15,20 +15,28 @@ pipeline {
                 
                 // Ensure the network exists
                 sh 'docker network inspect ${NORMINETTE_NETWORK} || docker network create ${NORMINETTE_NETWORK}'
+                
+                // Debug: List files
+                sh 'ls -la ${WORKSPACE}/src'
             }
         }
         
         stage('Norminette Check') {
             steps {
                 script {
-                    // Run Norminette check
+                    // Debug: Verbose file finding and Norminette check
                     def checkResult = sh(
                         script: """
                             docker run --rm \
                             --network ${NORMINETTE_NETWORK} \
                             -v ${WORKSPACE}/src:${SRC_FOLDER} \
                             ${NORMINETTE_IMAGE} \
-                            sh -c "find ${SRC_FOLDER} -type f \\( -name '*.c' -o -name '*.h' \\) | xargs norminette"
+                            sh -c "
+                                echo 'Finding files:';
+                                find ${SRC_FOLDER} -type f \\( -name '*.c' -o -name '*.h' \\);
+                                echo '\n\nRunning Norminette:\n';
+                                find ${SRC_FOLDER} -type f \\( -name '*.c' -o -name '*.h' \\) -print0 | xargs -0 norminette
+                            "
                         """,
                         returnStatus: true
                     )
@@ -42,13 +50,7 @@ pipeline {
                         sh -c "
                             echo 'Norminette Code Quality Report' > /norminette_report.txt;
                             echo '==========================' >> /norminette_report.txt;
-                            find ${SRC_FOLDER} -type f \\( -name '*.c' -o -name '*.h' \\) | while read file; do
-                                if norminette \"\$file\"; then
-                                    echo \"✅ PASSED: \$file\" >> /norminette_report.txt;
-                                else
-                                    echo \"❌ FAILED: \$file\" >> /norminette_report.txt;
-                                fi
-                            done;
+                            find ${SRC_FOLDER} -type f \\( -name '*.c' -o -name '*.h' \\) -print0 | xargs -0 norminette | tee -a /norminette_report.txt;
                             echo \"\nDetailed Statistics:\" >> /norminette_report.txt;
                             find ${SRC_FOLDER} -type f \\( -name '*.c' -o -name '*.h' \\) | wc -l >> /norminette_report.txt
                         "
@@ -57,21 +59,14 @@ pipeline {
                     // Copy report to Jenkins workspace
                     sh 'docker cp $(docker ps -lq):/norminette_report.txt ${WORKSPACE}/norminette_report.txt'
                     
+                    // Always show the report
+                    sh 'cat ${WORKSPACE}/norminette_report.txt'
+                    
                     // Fail the build if Norminette check fails
                     if (checkResult != 0) {
                         error "Norminette check failed"
                     }
                 }
-            }
-        }
-        
-        stage('Report') {
-            steps {
-                // Display report
-                sh 'cat norminette_report.txt'
-                
-                // Archive report
-                archiveArtifacts artifacts: 'norminette_report.txt', allowEmptyArchive: true
             }
         }
     }
