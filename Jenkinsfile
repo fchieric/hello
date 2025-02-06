@@ -20,7 +20,7 @@ pipeline {
             steps {
                 dir('src') {
                     script {
-                        sh '(norminette *.c) > norminette_output.txt'
+                        sh 'norminette -d > norminette_output.txt'
                         KO_FILES = sh(script: 'grep -c "Error!" norminette_output.txt || true', returnStdout: true).trim()
                         OK_FILES = "${TOTAL_FILES.toInteger() - KO_FILES.toInteger()}"
                         
