@@ -16,42 +16,50 @@ pipeline {
                 // Ensure the network exists
                 sh 'docker network inspect ${NORMINETTE_NETWORK} || docker network create ${NORMINETTE_NETWORK}'
                 
-                // Debug: List files
-                sh 'ls -la ${WORKSPACE}/src'
+                // Debug: List files and count
+                sh '''
+                    echo "Files in src directory:"
+                    ls -1 ${WORKSPACE}/src
+                    echo "Total files:"
+                    ls ${WORKSPACE}/src | wc -l
+                '''
             }
         }
         
         stage('Norminette Check') {
             steps {
                 script {
-                    // Debug: Verbose file finding and Norminette check
+                    // Extremely verbose Norminette check with explicit error handling
                     def checkResult = sh(
                         script: """
                             docker run --rm \
                             --network ${NORMINETTE_NETWORK} \
                             -v ${WORKSPACE}/src:${SRC_FOLDER} \
                             ${NORMINETTE_IMAGE} \
-                            sh -c "
-                                echo 'Finding files:';
-                                find ${SRC_FOLDER} -type f \\( -name '*.c' -o -name '*.h' \\);
-                                echo '\n\nRunning Norminette:\n';
-                                find ${SRC_FOLDER} -type f \\( -name '*.c' -o -name '*.h' \\) -print0 | xargs -0 norminette
+                            bash -c "
+                                set -x;
+                                which norminette;
+                                norminette --version;
+                                echo 'Scanning files:';
+                                find ${SRC_FOLDER} -type f \\( -name '*.c' -o -name '*.h' \\) -print0 | 
+                                    xargs -0 -I {} bash -c 'echo \"Checking file: {}\"; norminette \"{}\" || echo \"Error checking {}\"'
                             "
                         """,
                         returnStatus: true
                     )
                     
-                    // Generate detailed report
+                    // Detailed report generation
                     sh """
                         docker run --rm \
                         --network ${NORMINETTE_NETWORK} \
                         -v ${WORKSPACE}/src:${SRC_FOLDER} \
                         ${NORMINETTE_IMAGE} \
-                        sh -c "
+                        bash -c "
                             echo 'Norminette Code Quality Report' > /norminette_report.txt;
                             echo '==========================' >> /norminette_report.txt;
-                            find ${SRC_FOLDER} -type f \\( -name '*.c' -o -name '*.h' \\) -print0 | xargs -0 norminette | tee -a /norminette_report.txt;
-                            echo \"\nDetailed Statistics:\" >> /norminette_report.txt;
+                            find ${SRC_FOLDER} -type f \\( -name '*.c' -o -name '*.h' \\) -print0 | 
+                                xargs -0 norminette >> /norminette_report.txt 2>&1;
+                            echo '\n\nDetailed Statistics:' >> /norminette_report.txt;
                             find ${SRC_FOLDER} -type f \\( -name '*.c' -o -name '*.h' \\) | wc -l >> /norminette_report.txt
                         "
                     """
