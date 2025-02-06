@@ -1,14 +1,14 @@
 pipeline {
-    agent {
-        docker {
-            image 'python:3.8'
-        }
-    }
+    agent any
     
     stages {
-        stage('Install Norminette') {
+        stage('Install Python and Norminette') {
             steps {
-                sh 'pip install norminette'
+                sh '''
+                    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+                    python3 get-pip.py --user
+                    python3 -m pip install --user norminette
+                '''
             }
         }
         
@@ -22,7 +22,7 @@ pipeline {
                     for file in src/*.c; do
                         if [ -f "$file" ]; then
                             ((total_files++))
-                            if norminette "$file" > temp_result.txt 2>&1; then
+                            if ~/.local/bin/norminette "$file" > temp_result.txt 2>&1; then
                                 ((passed_files++))
                                 echo "[OK] $file"
                             else
