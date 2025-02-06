@@ -28,7 +28,7 @@ pipeline {
             steps {
                 script {
                     env.TOTAL_FILES = sh(
-                        script: '''find src/ -type f -name "*.c" | wc -l''',
+                        script: 'find src/ -type f -name "*.c" | wc -l',
                         returnStdout: true
                     ).trim()
                     echo "Found ${env.TOTAL_FILES} C files to check"
@@ -40,7 +40,6 @@ pipeline {
             steps {
                 script {
                     try {
-                        // Test con percorso assoluto
                         def normOutput = sh(
                             script: """
                                 docker run --rm \
@@ -55,7 +54,7 @@ pipeline {
                         echo "Norminette output: ${normOutput}"
                         
                         env.FAILED_FILES = sh(
-                            script: """echo "${normOutput}" | grep -c "Error!" || echo "0"""",
+                            script: 'echo "${normOutput}" | grep -c "Error!" || echo "0"',
                             returnStdout: true
                         ).trim()
                         
