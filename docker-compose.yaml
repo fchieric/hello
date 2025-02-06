@@ -1,5 +1,3 @@
-version: '3.8'
-
 networks:
   jenkins-norminette-network:
     driver: bridge
