@@ -15,9 +15,9 @@ pipeline {
                     def checkResult = sh(
                         script: """
                             docker run --rm \
-                            --network ${NORMINETTE_NETWORK} \
-                            -v ${WORKSPACE}/src:${SRC_FOLDER} \
-                            "${NORMINETTE_IMAGE}" \
+                            --network ${env.NORMINETTE_NETWORK} \
+                            -v ${env.WORKSPACE}/src:${env.SRC_FOLDER} \
+                            ${env.NORMINETTE_IMAGE} \
                             bash -c '
                                 set -e;
                                 echo "Norminette version: $(norminette --version)";
@@ -34,9 +34,9 @@ pipeline {
                     // Generate report
                     sh """
                         docker run --rm \
-                        --network ${NORMINETTE_NETWORK} \
-                        -v ${WORKSPACE}/src:${SRC_FOLDER} \
-                        "${NORMINETTE_IMAGE}" \
+                        --network ${env.NORMINETTE_NETWORK} \
+                        -v ${env.WORKSPACE}/src:${env.SRC_FOLDER} \
+                        ${env.NORMINETTE_IMAGE} \
                         bash -c '
                             echo "Norminette Code Quality Report" > /norminette_report.txt;
                             echo "==========================" >> /norminette_report.txt;
@@ -50,8 +50,8 @@ pipeline {
                     """
                     
                     // Copy and display report
-                    sh "docker cp \$(docker ps -lq):/norminette_report.txt ${WORKSPACE}/norminette_report.txt"
-                    sh "cat ${WORKSPACE}/norminette_report.txt"
+                    sh "docker cp \$(docker ps -lq):/norminette_report.txt ${env.WORKSPACE}/norminette_report.txt"
+                    sh "cat ${env.WORKSPACE}/norminette_report.txt"
                     
                     // Fail the build if Norminette check fails
                     if (checkResult != 0) {
