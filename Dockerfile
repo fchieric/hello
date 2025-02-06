@@ -24,5 +24,5 @@ RUN git clone https://github.com/42School/norminette.git && \
 
 WORKDIR /app
 
-# Remove Docker installation since it's not needed in the Norminette container
-# The Jenkins container will handle Docker operations
+# Keep container running
+CMD ["tail", "-f", "/dev/null"]
