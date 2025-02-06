@@ -16,17 +16,15 @@ pipeline {
                         script: """
                             docker run --rm \
                             --network ${env.NORMINETTE_NETWORK} \
-                            -v ${env.WORKSPACE}/src:${env.SRC_FOLDER} \
+                            -v "\${WORKSPACE}/src:${env.SRC_FOLDER}" \
                             ${env.NORMINETTE_IMAGE} \
-                            bash -c '
-                                set -e;
-                                echo "Norminette version: $(norminette --version)";
-                                echo "Scanning files:";
-                                for file in $(find /app/src -type f \\( -name "*.c" -o -name "*.h" \\)); do
-                                    echo "Checking file: $file";
-                                    norminette "$file" || echo "Error checking $file";
-                                done
-                            '
+                            bash -c 'set -e; \
+                                echo "Norminette version: \$(norminette --version)"; \
+                                echo "Scanning files:"; \
+                                for file in \$(find /app/src -type f \\( -name "*.c" -o -name "*.h" \\)); do \
+                                    echo "Checking file: \$file"; \
+                                    norminette "\$file" || echo "Error checking \$file"; \
+                                done'
                         """,
                         returnStatus: true
                     )
@@ -35,23 +33,29 @@ pipeline {
                     sh """
                         docker run --rm \
                         --network ${env.NORMINETTE_NETWORK} \
-                        -v ${env.WORKSPACE}/src:${env.SRC_FOLDER} \
+                        -v "\${WORKSPACE}/src:${env.SRC_FOLDER}" \
                         ${env.NORMINETTE_IMAGE} \
-                        bash -c '
-                            echo "Norminette Code Quality Report" > /norminette_report.txt;
-                            echo "==========================" >> /norminette_report.txt;
-                            for file in $(find /app/src -type f \\( -name "*.c" -o -name "*.h" \\)); do
-                                echo "Checking $file:" >> /norminette_report.txt;
-                                norminette "$file" >> /norminette_report.txt 2>&1;
-                            done;
-                            echo "\n\nDetailed Statistics:" >> /norminette_report.txt;
-                            find /app/src -type f \\( -name "*.c" -o -name "*.h" \\) | wc -l >> /norminette_report.txt
-                        '
+                        bash -c 'echo "Norminette Code Quality Report" > norminette_report.txt; \
+                            echo "==========================" >> norminette_report.txt; \
+                            total_files=\$(find /app/src -type f \\( -name "*.c" -o -name "*.h" \\) | wc -l); \
+                            passed=0; \
+                            failed=0; \
+                            for file in \$(find /app/src -type f \\( -name "*.c" -o -name "*.h" \\)); do \
+                                if norminette "\$file" > /dev/null 2>&1; then \
+                                    ((passed++)); \
+                                else \
+                                    ((failed++)); \
+                                    echo "❌ Failed: \$file" >> norminette_report.txt; \
+                                fi \
+                            done; \
+                            echo "\\nSummary:" >> norminette_report.txt; \
+                            echo "Total files scanned: \$total_files" >> norminette_report.txt; \
+                            echo "Passed: \$passed" >> norminette_report.txt; \
+                            echo "Failed: \$failed" >> norminette_report.txt'
                     """
                     
-                    // Copy and display report
-                    sh "docker cp \$(docker ps -lq):/norminette_report.txt ${env.WORKSPACE}/norminette_report.txt"
-                    sh "cat ${env.WORKSPACE}/norminette_report.txt"
+                    // Display report
+                    sh 'cat norminette_report.txt'
                     
                     // Fail the build if Norminette check fails
                     if (checkResult != 0) {
