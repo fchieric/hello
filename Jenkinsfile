@@ -23,17 +23,26 @@ pipeline {
         
         stage('Run Norminette') {
             agent {
-                docker {
-                    image 'ghcr.io/fchieric/norminette-checker:latest'
-                    args '-v ${WORKSPACE}:/workspace'
+                kubernetes {
+                    yaml '''
+                    apiVersion: v1
+                    kind: Pod
+                    spec:
+                      containers:
+                      - name: norminette
+                        image: ghcr.io/fchieric/norminette-checker:latest
+                        command:
+                        - cat
+                        tty: true
+                    '''
                 }
             }
             steps {
                 script {
                     try {
-                        // Esegui norminette e cattura l'output
+                        // Esegui norminette e salva l'output
                         def normOutput = sh(
-                            script: 'cd /workspace && norminette src/',
+                            script: 'norminette src/',
                             returnStdout: true
                         )
                         
