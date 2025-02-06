@@ -9,6 +9,22 @@ pipeline {
     }
     
     stages {
+        stage('Debug Environment') {
+            steps {
+                script {
+                    // Stampa il contenuto della directory per debug
+                    sh '''
+                        echo "Current directory: $PWD"
+                        echo "Workspace: $WORKSPACE"
+                        echo "Directory contents:"
+                        ls -la
+                        echo "src directory contents:"
+                        ls -la src/
+                    '''
+                }
+            }
+        }
+        
         stage('Prepare Environment') {
             steps {
                 script {
@@ -17,6 +33,7 @@ pipeline {
                         script: 'find src/ -type f -name "*.c" | wc -l',
                         returnStdout: true
                     ).trim()
+                    echo "Found ${env.TOTAL_FILES} C files to check"
                 }
             }
         }
@@ -25,25 +42,27 @@ pipeline {
             steps {
                 script {
                     try {
-                        // Esegui norminette usando direttamente il container
+                        // Esegui norminette usando il path assoluto
                         def normOutput = sh(
-                            script: '''
-                                docker run --rm -v ${WORKSPACE}:/app -w /app \
-                                ghcr.io/fchieric/norminette-checker:latest \
-                                norminette src/
-                            ''',
+                            script: """
+                                docker run --rm \
+                                    -v "\${PWD}":/workdir \
+                                    -w /workdir \
+                                    ghcr.io/fchieric/norminette-checker:latest \
+                                    norminette src/
+                            """,
                             returnStdout: true
                         )
                         
+                        echo "Norminette output: ${normOutput}"
+                        
                         // Conta i file falliti
                         env.FAILED_FILES = sh(
-                            script: '''
-                                echo "${normOutput}" | grep -c "Error!" || true
-                            ''',
+                            script: """echo "\${normOutput}" | grep -c "Error!" || echo "0" """,
                             returnStdout: true
-                        ).trim() ?: "0"
+                        ).trim()
                         
-                        // Calcola i file che hanno passato il test
+                        // Calcola i file che hanno passato
                         env.PASSED_FILES = "${Integer.parseInt(env.TOTAL_FILES) - Integer.parseInt(env.FAILED_FILES)}"
                         
                         // Se ci sono file falliti, marca lo stage come fallito
@@ -52,6 +71,7 @@ pipeline {
                         }
                     } catch (Exception e) {
                         env.NORMINETTE_EXIT_CODE = 1
+                        echo "Errore durante l'esecuzione di norminette: ${e.message}"
                         throw e
                     }
                 }
