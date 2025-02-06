@@ -1,19 +1,14 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'python:3.8'
+        }
+    }
     
     stages {
-        stage('Setup Python') {
-            steps {
-                sh '''
-                    sudo apt-get update
-                    sudo apt-get install -y python3-pip
-                '''
-            }
-        }
-        
         stage('Install Norminette') {
             steps {
-                sh 'pip3 install --user norminette'
+                sh 'pip install norminette'
             }
         }
         
@@ -24,12 +19,10 @@ pipeline {
                     passed_files=0
                     failed_files=0
                     
-                    echo "=== Starting Norminette Check ==="
-                    
                     for file in src/*.c; do
                         if [ -f "$file" ]; then
                             ((total_files++))
-                            if ~/.local/bin/norminette "$file" > temp_result.txt 2>&1; then
+                            if norminette "$file" > temp_result.txt 2>&1; then
                                 ((passed_files++))
                                 echo "[OK] $file"
                             else
@@ -41,15 +34,12 @@ pipeline {
                     done
                     
                     echo "=== Norminette Report ==="
-                    echo "Total files scanned: $total_files"
-                    echo "Files passed: $passed_files"
-                    echo "Files failed: $failed_files"
+                    echo "Total files: $total_files"
+                    echo "Passed: $passed_files"
+                    echo "Failed: $failed_files"
                     
                     rm -f temp_result.txt
-                    
-                    if [ $failed_files -gt 0 ]; then
-                        exit 1
-                    fi
+                    [ $failed_files -eq 0 ]
                 '''
             }
         }
