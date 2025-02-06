@@ -22,33 +22,24 @@ pipeline {
         }
         
         stage('Run Norminette') {
-            agent {
-                kubernetes {
-                    yaml '''
-                    apiVersion: v1
-                    kind: Pod
-                    spec:
-                      containers:
-                      - name: norminette
-                        image: ghcr.io/fchieric/norminette-checker:latest
-                        command:
-                        - cat
-                        tty: true
-                    '''
-                }
-            }
             steps {
                 script {
                     try {
-                        // Esegui norminette e salva l'output
+                        // Esegui norminette usando direttamente il container
                         def normOutput = sh(
-                            script: 'norminette src/',
+                            script: '''
+                                docker run --rm -v ${WORKSPACE}:/app -w /app \
+                                ghcr.io/fchieric/norminette-checker:latest \
+                                norminette src/
+                            ''',
                             returnStdout: true
                         )
                         
                         // Conta i file falliti
                         env.FAILED_FILES = sh(
-                            script: 'echo "${normOutput}" | grep -c "Error!"',
+                            script: '''
+                                echo "${normOutput}" | grep -c "Error!" || true
+                            ''',
                             returnStdout: true
                         ).trim() ?: "0"
                         
