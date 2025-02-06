@@ -2,11 +2,11 @@ pipeline {
     agent any
     
     stages {
-        stage('Install Python and Norminette') {
+        stage('Install Dependencies') {
             steps {
                 sh '''
-                    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-                    python3 get-pip.py --user
+                    apt-get update || true
+                    apt-get install -y python3 python3-pip || true
                     python3 -m pip install --user norminette
                 '''
             }
