@@ -6,13 +6,13 @@ pipeline {
         TOTAL_FILES = 0
         FAILED_FILES = 0
         PASSED_FILES = 0
+        WORKSPACE_PATH = '/var/jenkins_home/workspace/norminetter'
     }
     
     stages {
         stage('Debug Environment') {
             steps {
                 script {
-                    // Stampa il contenuto della directory per debug
                     sh '''
                         echo "Current directory: $PWD"
                         echo "Directory contents:"
@@ -27,9 +27,8 @@ pipeline {
         stage('Prepare Environment') {
             steps {
                 script {
-                    // Conta il numero totale di file C (correzione del comando find)
                     env.TOTAL_FILES = sh(
-                        script: 'find src/ -type f -name "*.c" | wc -l',
+                        script: '''find src/ -type f -name "*.c" | wc -l''',
                         returnStdout: true
                     ).trim()
                     echo "Found ${env.TOTAL_FILES} C files to check"
@@ -41,33 +40,27 @@ pipeline {
             steps {
                 script {
                     try {
-                        // Test del mount point
-                        sh 'docker run --rm -v "$PWD":/workdir -w /workdir alpine ls -la /workdir/src/'
-                        
-                        // Esegui norminette con path assoluto
+                        // Test con percorso assoluto
                         def normOutput = sh(
-                            script: '''
+                            script: """
                                 docker run --rm \
-                                    -v "$PWD":/workdir \
-                                    -w /workdir \
+                                    -v ${WORKSPACE_PATH}:/code \
+                                    -w /code \
                                     ghcr.io/fchieric/norminette-checker:latest \
-                                    sh -c "ls -la && norminette src/"
-                            ''',
+                                    norminette ./src/
+                            """,
                             returnStdout: true
                         )
                         
                         echo "Norminette output: ${normOutput}"
                         
-                        // Conta i file falliti
                         env.FAILED_FILES = sh(
-                            script: 'echo "${normOutput}" | grep -c "Error!" || echo "0"',
+                            script: """echo "${normOutput}" | grep -c "Error!" || echo "0"""",
                             returnStdout: true
                         ).trim()
                         
-                        // Calcola i file che hanno passato
                         env.PASSED_FILES = "${Integer.parseInt(env.TOTAL_FILES) - Integer.parseInt(env.FAILED_FILES)}"
                         
-                        // Se ci sono file falliti, marca lo stage come fallito
                         if (env.FAILED_FILES.toInteger() > 0) {
                             error "Norminette ha trovato errori in ${env.FAILED_FILES} file(i)"
                         }
