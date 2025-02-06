@@ -2,12 +2,12 @@ pipeline {
     agent any
     
     stages {
-        stage('Install Dependencies') {
+        stage('Setup') {
             steps {
                 sh '''
-                    apt-get update || true
-                    apt-get install -y python3 python3-pip || true
-                    python3 -m pip install --user norminette
+                    apt-get update
+                    apt-get install -y python3 python3-pip
+                    pip3 install norminette
                 '''
             }
         }
@@ -22,7 +22,7 @@ pipeline {
                     for file in src/*.c; do
                         if [ -f "$file" ]; then
                             ((total_files++))
-                            if ~/.local/bin/norminette "$file" > temp_result.txt 2>&1; then
+                            if norminette "$file" > temp_result.txt 2>&1; then
                                 ((passed_files++))
                                 echo "[OK] $file"
                             else
