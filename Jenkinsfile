@@ -6,11 +6,6 @@ pipeline {
         OK_FILES = '0'
     }   
    stages {
-        stage('Checkout nel branch') {
-            steps {
-                git branch: 'norminette', url: 'https://github.com/fchieric/hello.git'
-            }
-        }
         stage('Conta i file') {
             steps {
                  script {
