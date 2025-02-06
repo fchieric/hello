@@ -2,96 +2,86 @@ pipeline {
     agent any
     
     environment {
-        NORMINETTE_EXIT_CODE = 0
-        TOTAL_FILES = 0
-        FAILED_FILES = 0
-        PASSED_FILES = 0
+        NORMINETTE_NETWORK = 'jenkins-norminette-network'
+        SRC_FOLDER = '/app/src'
     }
     
     stages {
-        stage('Debug Environment') {
+        stage('Prepare') {
             steps {
-                script {
-                    sh '''
-                        echo "Current directory: $PWD"
-                        echo "Directory contents:"
-                        ls -la
-                        echo "src directory contents:"
-                        ls -la src/
-                        echo "Find test:"
-                        find "$(pwd)/src" -type f -name "*.c"
-                    '''
-                }
+                // Ensure the network exists
+                sh 'docker network inspect ${NORMINETTE_NETWORK} || docker network create ${NORMINETTE_NETWORK}'
             }
         }
         
-        stage('Prepare Environment') {
+        stage('Norminette Check') {
             steps {
                 script {
-                    env.TOTAL_FILES = sh(
-                        script: 'ls src/*.c | wc -l',
-                        returnStdout: true
-                    ).trim()
-                    echo "Found ${env.TOTAL_FILES} C files to check"
-                }
-            }
-        }
-        
-        stage('Run Norminette') {
-            steps {
-                script {
-                    try {
-                        def normOutput = sh(
-                            script: '''
-                                docker run --rm \\
-                                    -v "$(pwd)":/code:ro \\
-                                    -w /code \\
-                                    ghcr.io/fchieric/norminette-checker:latest \\
-                                    sh -c "pwd && ls -la && norminette src/*.c"
-                            ''',
-                            returnStdout: true
-                        )
-                        
-                        echo "Norminette output: ${normOutput}"
-                        
-                        env.FAILED_FILES = sh(
-                            script: 'echo "${normOutput}" | grep -c "Error!" || echo "0"',
-                            returnStdout: true
-                        ).trim()
-                        
-                        env.PASSED_FILES = "${Integer.parseInt(env.TOTAL_FILES) - Integer.parseInt(env.FAILED_FILES)}"
-                        
-                        if (env.FAILED_FILES.toInteger() > 0) {
-                            error "Norminette ha trovato errori in ${env.FAILED_FILES} file(i)"
-                        }
-                    } catch (Exception e) {
-                        env.NORMINETTE_EXIT_CODE = 1
-                        echo "Errore durante l'esecuzione di norminette: ${e.message}"
-                        throw e
+                    // Run Norminette check in the Norminette container
+                    def checkResult = sh(
+                        script: """
+                            docker run --rm \
+                            --network ${NORMINETTE_NETWORK} \
+                            -v ${WORKSPACE}/src:${SRC_FOLDER} \
+                            norminette \
+                            sh -c "find ${SRC_FOLDER} -type f \\( -name '*.c' -o -name '*.h' \\) | xargs norminette"
+                        """,
+                        returnStatus: true
+                    )
+                    
+                    // Generate report
+                    sh """
+                        docker run --rm \
+                        --network ${NORMINETTE_NETWORK} \
+                        -v ${WORKSPACE}/src:${SRC_FOLDER} \
+                        norminette \
+                        sh -c "
+                            echo 'Norminette Code Quality Report' > norminette_report.txt;
+                            echo '==========================' >> norminette_report.txt;
+                            find ${SRC_FOLDER} -type f \\( -name '*.c' -o -name '*.h' \\) | while read file; do
+                                if norminette \"\$file\"; then
+                                    echo \"✅ PASSED: \$file\" >> norminette_report.txt;
+                                else
+                                    echo \"❌ FAILED: \$file\" >> norminette_report.txt;
+                                fi
+                            done
+                        "
+                    """
+                    
+                    // Copy report to Jenkins workspace
+                    sh 'docker cp norminette:/norminette_report.txt ${WORKSPACE}/norminette_report.txt'
+                    
+                    // Fail the build if Norminette check fails
+                    if (checkResult != 0) {
+                        error "Norminette check failed"
                     }
                 }
+            }
+        }
+        
+        stage('Report') {
+            steps {
+                // Display report
+                sh 'cat norminette_report.txt'
+                
+                // Archive report
+                archiveArtifacts artifacts: 'norminette_report.txt', allowEmptyArchive: true
             }
         }
     }
     
     post {
-        success {
-            echo """
-            ✅ Norminette Check completato con successo!
-            📊 Report:
-            - File totali analizzati: ${env.TOTAL_FILES}
-            - File che hanno passato: ${env.PASSED_FILES}
-            - File con errori: ${env.FAILED_FILES}
-            """
+        always {
+            // Cleanup
+            sh 'docker network rm ${NORMINETTE_NETWORK} || true'
         }
+        
         failure {
-            echo """
-            ❌ Norminette Check fallito!
-            📊 Report:
-            - File totali analizzati: ${env.TOTAL_FILES}
-            - File che hanno passato: ${env.PASSED_FILES}
-            - File con errori: ${env.FAILED_FILES}
-            """
+            echo "Norminette check failed. Please review the report."
+        }
+        
+        success {
+            echo "Norminette check completed successfully!"
         }
     }
 }
